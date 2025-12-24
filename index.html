@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zootopia Prom Night ✨</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body { 
+            margin: 0; overflow: hidden; 
+            /* Nền chuyển màu kiểu dạ hội đêm */
+            background: radial-gradient(circle at center, #2b1331 0%, #0f0c29 100%);
+            font-family: 'Segoe UI', sans-serif; 
+        }
+        #canvas-container { width: 100%; height: 100vh; display: block; }
+        #ui-layer {
+            position: absolute; bottom: 30px; width: 100%;
+            text-align: center; pointer-events: none; z-index: 100;
+        }
+        .guide { 
+            color: #fff; font-weight: bold; font-size: 14px; margin-bottom: 20px; 
+            text-shadow: 0 0 5px #ff4500, 0 0 10px #00bfff;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 12px 25px; border-radius: 30px; display: inline-block;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        button {
+            pointer-events: auto; cursor: pointer;
+            background: linear-gradient(to right, #ff4500, #ff8c00);
+            color: #fff; border: none;
+            padding: 15px 50px; border-radius: 50px; 
+            font-weight: 800; font-size: 18px;
+            box-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 69, 0, 0.5); } 50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(255, 69, 0, 0.8); } 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 69, 0, 0.5); } }
+        #camera-preview {
+            position: absolute; top: 15px; right: 15px; width: 100px; height: 75px;
+            border: 2px solid #ff8c00; transform: scaleX(-1); opacity: 0.6; border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-layer">
+        <div class="guide">
+            🖐 <b>Xòe tay:</b> Bút Cà rốt &nbsp;|&nbsp; 🫶 <b>Chụm tay:</b> Hóa thân Nick &nbsp;|&nbsp; ✊ <b>Nắm tay:</b> Dạ hội Zootopia
+        </div>
+        <br>
+        <button id="btnStart" onclick="startSystem()">THAM GIA DẠ HỘI ✨</button>
+    </div>
+    <div id="canvas-container"></div>
+    <video class="input_video" playsinline webkit-playsinline muted autoplay style="width:1px;height:1px;position:absolute;opacity:0;pointer-events:none;z-index:-1;"></video>
+    <canvas id="camera-preview"></canvas>
+
+    <script>
+        const MUSIC_URL = "./audio.mp3";
+        let bgMusic = new Audio(MUSIC_URL); bgMusic.loop = true; bgMusic.volume = 1.0;
+
+        const loader = new THREE.TextureLoader();
+        const photoFiles = ['./image1.jpeg', './image2.jpeg', './image3.jpeg', './image4.jpeg', './image5.jpeg'];
+        const photoTextures = []; photoFiles.forEach((f, i) => photoTextures[i] = loader.load(f));
+        const nickTexture = loader.load('./nick.png');
+        const judyTexture = loader.load('./judy.png');
+
+        // Tạo texture hạt phát sáng
+        function createGlowTexture(colorHex) {
+            const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            grd.addColorStop(0, "#ffffff"); 
+            grd.addColorStop(0.2, colorHex);
+            grd.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = grd; ctx.fillRect(0,0,64,64);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const textures = {
+            nickOrange: createGlowTexture('#FF4500'), // Cam Nick
+            judyBlue: createGlowTexture('#00BFFF'),   // Xanh Judy
+            carrotGreen: createGlowTexture('#32CD32') // Xanh lá
+        };
+
+        const CONFIG = { nickCount: 2000, judyCount: 1500, orbitRadius: 50 };
+        let scene, camera, renderer;
+        // Tách thành 2 nhóm hạt riêng biệt để dễ quản lý màu
+        let groupNickParticles, groupJudyParticles;
+        let photoMeshes = [], nickMesh, judyMesh, titleMesh;
+        let state = 'DUO'; let handX = 0.5;
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            // Sương mù tím nhẹ dạ hội
+            scene.fog = new THREE.FogExp2(0x2b1331, 0.0015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.position.z = (window.innerWidth < 768) ? 180 : 130;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Tạo 2 hệ thống hạt: 1 cho Nick (chủ đạo cam), 1 cho Judy (chủ đạo xanh)
+            groupNickParticles = createParticleSystem('NICK', CONFIG.nickCount, 3.5);
+            groupJudyParticles = createParticleSystem('JUDY', CONFIG.judyCount, 3.5);
+
+            createPhotos(); createCenterDuo(); createTitle();
+            animate();
+        }
+
+        // Hàm tạo hình dáng trừu tượng
+        function getTargetPositions(type, count, role) {
+            const pDuo = [], pFox = [], pCarrot = [];
+            for(let i=0; i<count; i++) {
+                // --- 1. DUO STATE (Dạ hội) ---
+                if (role === 'NICK') {
+                    // Hình dáng Nick cao gầy bên trái
+                    const h = Math.random() * 90; const y = h - 45;
+                    const w = (1 - h/90) * 15 + 5; 
+                    pDuo.push(-30 + (Math.random()-0.5)*w, y, (Math.random()-0.5)*15);
+                } else {
+                    // Hình dáng Judy thấp hơn, váy xòe bên phải
+                    const h = Math.random() * 60; const y = h - 40;
+                    let w = (h/60) * 25 + 5; // Váy xòe ở dưới
+                    if (h > 40) w = 8; // Đầu/thân trên nhỏ
+                    pDuo.push(30 + (Math.random()-0.5)*w, y, (Math.random()-0.5)*20);
+                }
+
+                // --- 2. FOX STATE (Nick toàn thân) ---
+                // Cả 2 nhóm hạt đều tham gia tạo hình này
+                const part = Math.random();
+                if (part < 0.2) { // Đầu (Kim cương ngược)
+                    const y = 50 + Math.random()*20;
+                    const w = (70-y)*0.8;
+                    pFox.push((Math.random()-0.5)*w, y, (Math.random()-0.5)*10);
+                } else if (part < 0.6) { // Thân (Hình trụ dài)
+                    const y = Math.random()*50;
+                    pFox.push((Math.random()-0.5)*25, y, (Math.random()-0.5)*15);
+                } else if (part < 0.8) { // Chân (2 trụ nhỏ)
+                    const y = -Math.random()*40;
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    pFox.push(side*10 + (Math.random()-0.5)*8, y, (Math.random()-0.5)*8);
+                } else { // Đuôi (Cong ra sau)
+                    const t = Math.random() * Math.PI; 
+                    const y = Math.sin(t)*30;
+                    const z = -Math.cos(t)*30 - 10;
+                    pFox.push((Math.random()-0.5)*15, y, z);
+                }
+
+                // --- 3. CARROT STATE (Bút) ---
+                if (role === 'NICK') {
+                    // Thân cà rốt (Cam)
+                    const h = Math.random() * 80; const y = h - 40;
+                    const r = 12 * (1 - h/80) + 1;
+                    const theta = Math.random() * Math.PI * 2;
+                    pCarrot.push(r * Math.cos(theta), y, r * Math.sin(theta));
+                } else {
+                    // Lá trên đầu (Xanh)
+                    const y = 40 + Math.random()*15;
+                    pCarrot.push((Math.random()-0.5)*20, y, (Math.random()-0.5)*20);
+                }
+            }
+            return { duo: pDuo, fox: pFox, carrot: pCarrot };
+        }
+
+        function createParticleSystem(role, count, size) {
+            const targets = getTargetPositions(state, count, role);
+            // Vị trí ban đầu ngẫu nhiên
+            const pPositions = new Float32Array(count * 3);
+            for(let i=0; i<count*3; i++) pPositions[i] = (Math.random()-0.5)*200;
+
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+            // Lưu các đích đến vào userData
+            geo.userData = { ...targets, role: role };
+
+            // Material mặc định ban đầu
+            const mat = new THREE.PointsMaterial({
+                size: size, map: role==='NICK'?textures.nickOrange:textures.judyBlue,
+                transparent: true, opacity: 0.8,
+                depthWrite: false, blending: THREE.AdditiveBlending
+            });
+            const points = new THREE.Points(geo, mat);
+            scene.add(points);
+            return points;
+        }
+
+        function createPhotos() {
+            // Khung ảnh lấp lánh
+            const geo = new THREE.PlaneGeometry(14, 14); 
+            const frameGeo = new THREE.PlaneGeometry(15, 15);
+            const frameMat = new THREE.MeshBasicMaterial({color: 0xffd700, side:THREE.DoubleSide});
+            for(let i=0; i<5; i++) {
+                const mat = new THREE.MeshBasicMaterial({ map: photoTextures[i], side: THREE.DoubleSide });
+                const mesh = new THREE.Mesh(geo, mat);
+                const frame = new THREE.Mesh(frameGeo, frameMat); frame.position.z = -0.1;
+                mesh.add(frame); mesh.visible = false;
+                scene.add(mesh); photoMeshes.push(mesh);
+            }
+        }
+
+        function createCenterDuo() {
+            const nickMat = new THREE.MeshBasicMaterial({ map: nickTexture, transparent: true });
+            nickMesh = new THREE.Mesh(new THREE.PlaneGeometry(35, 50), nickMat);
+            nickMesh.position.set(-20, -5, 0);
+            
+            const judyMat = new THREE.MeshBasicMaterial({ map: judyTexture, transparent: true });
+            judyMesh = new THREE.Mesh(new THREE.PlaneGeometry(30, 45), judyMat);
+            judyMesh.position.set(20, -8, 5);
+            scene.add(nickMesh); scene.add(judyMesh);
+        }
+
+        function createTitle() {
+            const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.font = 'bold italic 90px "Segoe UI", sans-serif'; 
+            ctx.fillStyle = '#FFD700'; ctx.textAlign = 'center';
+            ctx.shadowColor = "#FF4500"; ctx.shadowBlur = 30; 
+            ctx.fillText("ZOOTOPIA PROM NIGHT", 512, 150);
+            const tex = new THREE.CanvasTexture(canvas);
+            titleMesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 15), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+            titleMesh.position.set(0, 65, 0);
+            scene.add(titleMesh);
+        }
+
+        function updateParticles(group, targetState, speed) {
+            const positions = group.geometry.attributes.position.array;
+            const role = group.geometry.userData.role;
+            const targetKey = (targetState === 'DUO') ? 'duo' : (targetState === 'FOX' ? 'fox' : 'carrot');
+            const targets = group.geometry.userData[targetKey];
+
+            for(let i=0; i<positions.length; i++) {
+                positions[i] += (targets[i] - positions[i]) * speed;
+            }
+            group.geometry.attributes.position.needsUpdate = true;
+
+            // Xử lý màu sắc và xoay dựa trên trạng thái
+            if (targetState === 'DUO') {
+                // Trả về màu gốc: Nick cam, Judy xanh
+                group.material.map = role==='NICK' ? textures.nickOrange : textures.judyBlue;
+                group.rotation.y += 0.003; // Xoay nhẹ khiêu vũ
+            } else if (targetState === 'FOX') {
+                // Tất cả hóa Cam
+                group.material.map = textures.nickOrange;
+                group.rotation.y = (handX - 0.5) * 0.3; // Xoay theo tay
+            } else if (targetState === 'CARROT') {
+                // Nick làm thân (cam), Judy làm lá (xanh lá)
+                group.material.map = role==='NICK' ? textures.nickOrange : textures.carrotGreen;
+                group.rotation.y += 0.01; // Xoay nhanh hơn
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = Date.now() * 0.001;
+            updateParticles(groupNickParticles, state, 0.08);
+            updateParticles(groupJudyParticles, state, 0.08);
+
+            if (state === 'DUO') {
+                nickMesh.visible = true; judyMesh.visible = true; titleMesh.visible = true;
+                nickMesh.scale.lerp(new THREE.Vector3(1,1,1), 0.1);
+                judyMesh.scale.lerp(new THREE.Vector3(1,1,1), 0.1);
+                // Ảnh bay vòng quanh
+                photoMeshes.forEach((mesh, i) => {
+                    mesh.visible = true;
+                    const angle = time * 0.4 + i * (Math.PI * 2 / 5);
+                    mesh.position.lerp(new THREE.Vector3(Math.sin(angle)*CONFIG.orbitRadius, Math.sin(time+i)*8, Math.cos(angle)*CONFIG.orbitRadius), 0.1);
+                    mesh.lookAt(camera.position); mesh.scale.set(1,1,1);
+                });
+            } else {
+                nickMesh.scale.lerp(new THREE.Vector3(0,0,0), 0.1);
+                judyMesh.scale.lerp(new THREE.Vector3(0,0,0), 0.1);
+                titleMesh.visible = false;
+                photoMeshes.forEach(m => { m.visible = false; m.scale.set(0,0,0); });
+            }
+            renderer.render(scene, camera);
+        }
+
+        function startSystem() {
+            document.getElementById('btnStart').style.display = 'none';
+            bgMusic.play().catch(e => console.log(e));
+            init3D();
+            const video = document.getElementsByClassName('input_video')[0];
+            const canvas = document.getElementById('camera-preview');
+            const ctx = canvas.getContext('2d');
+            const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+            hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
+            hands.onResults(results => {
+                ctx.clearRect(0,0,100,75); ctx.drawImage(results.image, 0, 0, 100, 75);
+                if(results.multiHandLandmarks.length > 0) {
+                    const lm = results.multiHandLandmarks[0]; handX = lm[9].x; 
+                    const tips = [8,12,16,20]; const wrist = lm[0];
+                    let openDist = 0; tips.forEach(i => openDist += Math.hypot(lm[i].x-wrist.x, lm[i].y-wrist.y));
+                    const pinchDist = Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y);
+                    if (pinchDist < 0.06) state = 'FOX'; 
+                    else if (openDist/4 > 0.3) state = 'CARROT'; 
+                    else state = 'DUO'; 
+                } else { state = 'DUO'; }
+            });
+            const cameraUtils = new Camera(video, { onFrame: async () => { await hands.send({image: video}); }, width: 320, height: 240 });
+            cameraUtils.start();
+        }
+        window.addEventListener('resize', () => { if(camera) { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); } });
+    </script>
+</body>
+</html>
