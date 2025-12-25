@@ -42,25 +42,29 @@
         const judyImg = new Image(); judyImg.src = './judy.png';
         const carrotImg = new Image(); carrotImg.src = './carrot.png';
 
-        function createDotTexture() {
-            const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+        // FIX 1: TẠO TEXTURE HẠT SẮC NÉT (KHÔNG MỜ)
+        function createSharpDotTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 16;
             const ctx = canvas.getContext('2d');
-            // Vẽ chấm tròn mềm (Soft dot)
-            const grd = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-            grd.addColorStop(0, "rgba(255,255,255,1)");
-            grd.addColorStop(0.5, "rgba(255,255,255,0.8)"); 
-            grd.addColorStop(1, "rgba(255,255,255,0)");
-            ctx.fillStyle = grd; ctx.fillRect(0,0,32,32);
+            ctx.beginPath(); ctx.arc(8, 8, 7, 0, Math.PI * 2, false); ctx.fillStyle = 'white'; ctx.fill();
             return new THREE.CanvasTexture(canvas);
         }
-        const particleTexture = createDotTexture();
-        const heartTexture = loader.load('https://threejs.org/examples/textures/sprites/heart.png'); // Dùng texture online cho tim đẹp hơn hoặc tự vẽ
+        const particleTexture = createSharpDotTexture();
+        
+        function createHeartTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = "#ff1493"; ctx.beginPath();
+            ctx.moveTo(32, 12); ctx.bezierCurveTo(32, 8, 28, 0, 16, 0); ctx.bezierCurveTo(0, 0, 0, 22, 0, 24);
+            ctx.bezierCurveTo(0, 38, 16, 48, 32, 64); ctx.bezierCurveTo(48, 48, 64, 38, 64, 24); ctx.bezierCurveTo(64, 22, 64, 0, 48, 0);
+            ctx.bezierCurveTo(36, 0, 32, 8, 32, 12); ctx.fill();
+            const tex = new THREE.CanvasTexture(canvas); tex.needsUpdate = true; return tex;
+        }
+        const heartTexture = createHeartTexture();
 
-        // TĂNG SỐ LƯỢNG HẠT LÊN RẤT CAO ĐỂ ẢNH RÕ NÉT
         const CONFIG = { 
-            particleCount: 25000, 
+            particleCount: 18000, // Số lượng hạt vừa đủ
             heartCount: 150,
-            density: 2 // Quét kỹ từng 2 pixel (Số càng nhỏ ảnh càng nét)
+            scanStep: 4 // FIX 2: Quét thưa hơn (4px) để tạo khoảng cách giữa các hạt
         };
         
         let scene, camera, renderer, mainParticles, heartParticles;
@@ -83,14 +87,11 @@
             createPhotos(); createFloatingHearts();
 
             Promise.all([
-                // QUÉT ẢNH VỚI ĐỘ PHÂN GIẢI CAO (Density thấp = Nét)
-                imageToPoints(nickImg, -35, 0.9, CONFIG.density),   
-                imageToPoints(judyImg, 35, 0.75, CONFIG.density),    
-                imageToPoints(carrotImg, 0, 0.8, 3) // Cà rốt thưa hơn xíu cho nghệ thuật
+                imageToPoints(nickImg, -35, 0.9, CONFIG.scanStep),   
+                imageToPoints(judyImg, 35, 0.75, CONFIG.scanStep),    
+                imageToPoints(carrotImg, 0, 0.8, CONFIG.scanStep)
             ]).then(results => {
                 const [nickData, judyData, carrotData] = results;
-                
-                // Gộp Nick & Judy
                 const duoPoints = [...nickData.points, ...judyData.points];
                 const duoCols = [...nickData.colors, ...judyData.colors];
                 
@@ -107,38 +108,29 @@
         }
 
         function fillBuffer(buffer, data) { 
-            if (!data || data.length === 0) {
-                // Nếu không có dữ liệu, ẩn hạt đi
-                for (let i=0; i<buffer.length; i++) buffer[i] = 9999; 
-                return;
-            }
-            // Điền dữ liệu, nếu thiếu thì lặp lại nhưng thêm nhiễu để không bị trùng vị trí
+            if (!data || data.length === 0) { for (let i=0; i<buffer.length; i++) buffer[i] = 9999; return; }
             for (let i = 0; i < buffer.length; i++) {
                 buffer[i] = data[i % data.length];
-                // Nếu lặp lại (vượt quá độ dài gốc), thêm chút nhiễu nhẹ
-                if (i >= data.length) buffer[i] += (Math.random()-0.5) * 1.0;
+                if (i >= data.length) buffer[i] += (Math.random()-0.5) * 2.0; // Thêm nhiễu nhẹ nếu lặp lại
             }
         }
 
-        function imageToPoints(img, offsetX, scale, density) {
+        function imageToPoints(img, offsetX, scale, step) {
             return new Promise(resolve => {
                 const run = () => {
                     const canvas = document.createElement('canvas');
-                    const w = 220; // Canvas lớn để lấy chi tiết
-                    const h = w * (img.height / img.width);
+                    const w = 250; const h = w * (img.height / img.width);
                     canvas.width = w; canvas.height = h;
                     const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
-                    
                     if (img.width === 0) { resolve({points:[], colors:[]}); return; }
-
                     const data = ctx.getImageData(0, 0, w, h).data;
                     const points = [], colors = [];
                     
-                    for(let y=0; y<h; y+=density) {
-                        for(let x=0; x<w; x+=density) {
+                    // FIX 3: QUÉT THEO BƯỚC NHẢY (STEP) ĐỂ TẠO KHOẢNG CÁCH
+                    for(let y=0; y<h; y+=step) {
+                        for(let x=0; x<w; x+=step) {
                             const i = (y*w + x) * 4;
-                            // Ngưỡng alpha thấp (20) để lấy cả các chi tiết mờ như váy/lông
-                            if(data[i+3] > 20) { 
+                            if(data[i+3] > 30) { 
                                 points.push((x - w/2) * scale + offsetX, -(y - h/2) * scale, 0);
                                 colors.push(data[i]/255, data[i+1]/255, data[i+2]/255);
                             }
@@ -155,17 +147,20 @@
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(CONFIG.particleCount * 3);
             const col = new Float32Array(CONFIG.particleCount * 3);
-            // Khởi tạo vị trí ẩn
             for(let i=0; i<pos.length; i++) pos[i] = (Math.random()-0.5)*500; 
             
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
             
-            // KÍCH THƯỚC HẠT (1.5) - Đủ to để rõ, đủ nhỏ để mịn
+            // FIX 4: MATERIAL CHUẨN MÀU, KHÔNG PHÁT SÁNG
             const mat = new THREE.PointsMaterial({
-                size: 1.5, map: particleTexture, vertexColors: true, 
-                transparent: true, opacity: 1.0, // Độ rõ 100%
-                depthWrite: false, blending: THREE.AdditiveBlending
+                size: 1.3, // Kích thước hạt vừa phải
+                map: particleTexture, 
+                vertexColors: true, 
+                transparent: true, 
+                opacity: 1.0, // Rõ nét 100%
+                depthWrite: false
+                // ĐÃ BỎ AdditiveBlending ĐỂ MÀU KHÔNG BỊ BỆT/CHÓI
             });
             mainParticles = new THREE.Points(geo, mat); scene.add(mainParticles);
         }
@@ -178,7 +173,7 @@
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             const mat = new THREE.PointsMaterial({
-                size: 4.0, color: 0xff1493, map: particleTexture,
+                size: 4.0, map: heartTexture, color: 0xff1493,
                 transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending
             });
             heartParticles = new THREE.Points(geo, mat); scene.add(heartParticles);
@@ -201,13 +196,9 @@
             const colors = mainParticles.geometry.attributes.color.array;
             let targetPos, targetCol;
             
-            if (state === 'CARROT') { 
-                targetPos = targetPositions.carrot; targetCol = targetColors.carrot; mainParticles.visible = true; 
-            } else if (state === 'FOX') { 
-                mainParticles.visible = false; return; 
-            } else { 
-                targetPos = targetPositions.duo; targetCol = targetColors.duo; mainParticles.visible = true; 
-            }
+            if (state === 'CARROT') { targetPos = targetPositions.carrot; targetCol = targetColors.carrot; mainParticles.visible = true; }
+            else if (state === 'FOX') { mainParticles.visible = false; return; }
+            else { targetPos = targetPositions.duo; targetCol = targetColors.duo; mainParticles.visible = true; }
 
             for(let i=0; i<positions.length; i++) {
                 positions[i] += (targetPos[i] - positions[i]) * speed;
@@ -215,7 +206,6 @@
             }
             mainParticles.geometry.attributes.position.needsUpdate = true;
             mainParticles.geometry.attributes.color.needsUpdate = true;
-            // ĐỨNG YÊN (KHÔNG XOAY)
             mainParticles.rotation.y = 0; mainParticles.rotation.x = 0;
         }
 
@@ -223,7 +213,6 @@
             if (state === 'FOX') { 
                 photoMeshes.forEach((mesh, i) => {
                     mesh.visible = true;
-                    // Ảnh bay theo tay
                     const baseAngle = -Math.PI/2 + (i-2)*0.35; const radius = 65;
                     const handTilt = (handX - 0.5) * 1.5; const finalAngle = baseAngle + handTilt;
                     const targetX = Math.sin(finalAngle) * radius; const targetZ = Math.cos(finalAngle) * radius - 40; const targetY = Math.cos(finalAngle) * 10 - 5;
