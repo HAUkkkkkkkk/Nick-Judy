@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FOR NA YÊU ❤️</title>
+    <title>FOR ERYK ❤️</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
@@ -13,6 +13,7 @@
         body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', sans-serif; cursor: pointer; }
         #canvas-container { width: 100%; height: 100vh; display: block; }
         
+        /* ĐÃ SỬA TIÊU ĐỀ Ở ĐÂY */
         #main-title {
             position: absolute; top: 30px; width: 100%; text-align: center;
             color: #fff; font-weight: 800; font-size: 40px; letter-spacing: 2px;
@@ -30,7 +31,7 @@
     </style>
 </head>
 <body>
-    <div id="main-title">FOR NA YÊU</div>
+    <div id="main-title">FOR ERYK</div>
     <div id="start-guide">Chạm vào màn hình để bắt đầu ✨</div>
 
     <div id="canvas-container"></div>
@@ -44,8 +45,7 @@
         const photoFiles = ['./image1.jpeg', './image2.jpeg', './image3.jpeg', './image4.jpeg', './image5.jpeg'];
         const photoTextures = []; photoFiles.forEach((f, i) => photoTextures[i] = loader.load(f));
         
-        // TẢI ẢNH ĐỂ QUÉT HẠT
-        // Đã bỏ letter.png
+        // Tải ảnh để quét hạt
         const nickImg = new Image(); nickImg.src = './nick.png';
         const judyImg = new Image(); judyImg.src = './judy.png';
         const carrotImg = new Image(); carrotImg.src = './carrot.png';
@@ -63,10 +63,11 @@
         }
         const heartTexture = createHeartTexture();
 
-        const CONFIG = { particleCount: 7000, heartCount: 200, orbitRadius: 60 };
+        // Tăng lượng hạt lên để hình rõ nét hơn
+        const CONFIG = { particleCount: 8000, heartCount: 200, orbitRadius: 60 };
         
         let scene, camera, renderer, mainParticles, heartParticles;
-        let photoMeshes = []; // Đã bỏ letterMesh
+        let photoMeshes = [];
         let state = 'DUO'; let handX = 0.5;
         
         let targetPositions = { duo: null, carrot: null, fox: null };
@@ -86,15 +87,17 @@
 
             createPhotos(); createFloatingHearts();
 
-            // XỬ LÝ ẢNH -> HẠT
+            // --- PHẦN QUAN TRỌNG: XỬ LÝ ẢNH ---
             Promise.all([
-                imageToPoints(nickImg, -30, 0.7),   // Duo: Nick trái
-                imageToPoints(judyImg, 30, 0.6),    // Duo: Judy phải
-                imageToPoints(carrotImg, 0, 0.8),   // Carrot: Cà rốt giữa
-                imageToPoints(nickImg, 0, 1.0)      // Fox: Cáo to ở giữa (khi chụm tay)
+                // Điều chỉnh tọa độ (offset) và tỷ lệ (scale) để Nick và Judy không bị chồng lấn
+                imageToPoints(nickImg, -35, 0.8),   // Nick bên trái, to hơn chút
+                imageToPoints(judyImg, 35, 0.7),    // Judy bên phải, nhỏ hơn chút
+                imageToPoints(carrotImg, 0, 0.8),   // Cà rốt giữa
+                imageToPoints(nickImg, 0, 1.1)      // Cáo to (khi chụm tay)
             ]).then(results => {
                 const [nickData, judyData, carrotData, foxData] = results;
                 
+                // Gộp điểm của Nick và Judy lại
                 const duoPoints = [...nickData.points, ...judyData.points];
                 const duoCols = [...nickData.colors, ...judyData.colors];
                 
@@ -105,6 +108,7 @@
                 targetPositions.fox = new Float32Array(CONFIG.particleCount * 3);
                 targetColors.fox = new Float32Array(CONFIG.particleCount * 3);
 
+                // Điền dữ liệu vào bộ nhớ
                 fillBuffer(targetPositions.duo, duoPoints); fillBuffer(targetColors.duo, duoCols);
                 fillBuffer(targetPositions.carrot, carrotData.points); fillBuffer(targetColors.carrot, carrotData.colors);
                 fillBuffer(targetPositions.fox, foxData.points); fillBuffer(targetColors.fox, foxData.colors);
@@ -117,6 +121,7 @@
             if (!data || data.length === 0) {
                 for (let i=0; i<buffer.length; i++) buffer[i] = (Math.random()-0.5)*100; return;
             }
+            // Lặp lại dữ liệu nếu số điểm ảnh ít hơn số hạt
             for (let i = 0; i < buffer.length; i++) buffer[i] = data[i % data.length]; 
         }
 
@@ -133,7 +138,7 @@
                     for(let y=0; y<h; y++) {
                         for(let x=0; x<w; x++) {
                             const i = (y*w + x) * 4;
-                            if(data[i+3] > 100) { 
+                            if(data[i+3] > 100) { // Lấy điểm không trong suốt
                                 points.push((x - w/2) * scale + offsetX, -(y - h/2) * scale, 0);
                                 colors.push(data[i]/255, data[i+1]/255, data[i+2]/255);
                             }
@@ -141,6 +146,7 @@
                     }
                     resolve({ points, colors });
                 };
+                // Đảm bảo ảnh đã tải xong mới xử lý
                 if(img.complete && img.naturalWidth !== 0) run(); 
                 else { img.onload = run; img.onerror = () => resolve({points:[], colors:[]}); }
             });
@@ -153,6 +159,7 @@
             for(let i=0; i<pos.length; i++) pos[i] = (Math.random()-0.5)*300;
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+            // Hạt nhỏ mịn
             const mat = new THREE.PointsMaterial({
                 size: 1.2, vertexColors: true, transparent: true, opacity: 0.9,
                 depthWrite: false, blending: THREE.AdditiveBlending
@@ -184,7 +191,6 @@
                 mesh.add(border); mesh.visible = false; scene.add(mesh); photoMeshes.push(mesh);
             }
         }
-        // Đã xóa hàm createLetter()
 
         function updateMainParticles(speed) {
             if(!mainParticles || !targetPositions.duo) return;
@@ -200,8 +206,6 @@
                 targetPos = targetPositions.duo; targetCol = targetColors.duo;
             }
 
-            // Luôn hiện hạt (vì không còn thư để che nữa)
-            mainParticles.visible = true;
             for(let i=0; i<positions.length; i++) {
                 positions[i] += (targetPos[i] - positions[i]) * speed;
                 colors[i] += (targetCol[i] - colors[i]) * speed;
@@ -228,7 +232,7 @@
             const speed = 0.08; 
             updateMainParticles(speed); updateHearts(time);
 
-            if (state === 'FOX') { // CHỤM TAY -> HIỆN ẢNH + HÌNH CÁO TO
+            if (state === 'FOX') { // CHỤM TAY -> HIỆN ẢNH POLAROID
                 photoMeshes.forEach((mesh, i) => {
                     mesh.visible = true;
                     const angle = -Math.PI/2 + (i-2)*0.3; const r = 70;
