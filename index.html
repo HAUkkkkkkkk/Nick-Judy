@@ -4,35 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FOR ERYK ❤️</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', sans-serif; cursor: pointer; }
+        body { margin: 0; overflow: hidden; background-color: #020202; font-family: 'Segoe UI', sans-serif; cursor: pointer; }
         #canvas-container { width: 100%; height: 100vh; display: block; }
         
-        /* ĐÃ SỬA TIÊU ĐỀ Ở ĐÂY */
+        /* TIÊU ĐỀ MỚI */
         #main-title {
             position: absolute; top: 30px; width: 100%; text-align: center;
-            color: #fff; font-weight: 800; font-size: 40px; letter-spacing: 2px;
-            text-shadow: 0 0 10px rgba(255,105,180,0.8), 0 0 20px rgba(255,105,180,0.4);
+            color: #fff; font-weight: 800; font-size: 45px; letter-spacing: 3px;
+            text-shadow: 0 0 10px rgba(255,20,147,0.8), 0 0 20px rgba(255,20,147,0.4);
             z-index: 100; pointer-events: none;
+            font-family: 'Arial', sans-serif; text-transform: uppercase;
         }
 
         #start-guide {
             position: absolute; top: 50%; width: 100%; text-align: center;
-            color: rgba(255,255,255,0.6); font-size: 18px;
+            color: rgba(255,255,255,0.5); font-size: 16px;
             transform: translateY(-50%); pointer-events: none;
             animation: fade 2s infinite;
         }
-        @keyframes fade { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+        @keyframes fade { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="main-title">FOR ERYK</div>
-    <div id="start-guide">Chạm vào màn hình để bắt đầu ✨</div>
+    <div id="start-guide">Chạm màn hình để bắt đầu ✨</div>
 
     <div id="canvas-container"></div>
     <video class="input_video" playsinline webkit-playsinline muted autoplay style="width:1px;height:1px;position:absolute;opacity:0;pointer-events:none;z-index:-1;"></video>
@@ -45,7 +47,7 @@
         const photoFiles = ['./image1.jpeg', './image2.jpeg', './image3.jpeg', './image4.jpeg', './image5.jpeg'];
         const photoTextures = []; photoFiles.forEach((f, i) => photoTextures[i] = loader.load(f));
         
-        // Tải ảnh để quét hạt
+        // TẢI ẢNH ASSETS
         const nickImg = new Image(); nickImg.src = './nick.png';
         const judyImg = new Image(); judyImg.src = './judy.png';
         const carrotImg = new Image(); carrotImg.src = './carrot.png';
@@ -53,7 +55,7 @@
         function createHeartTexture() {
             const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = "#ff69b4"; ctx.beginPath();
+            ctx.fillStyle = "#ff1493"; ctx.beginPath(); // Màu hồng đậm hơn chút
             ctx.moveTo(32, 12);
             ctx.bezierCurveTo(32, 8, 28, 0, 16, 0); ctx.bezierCurveTo(0, 0, 0, 22, 0, 24);
             ctx.bezierCurveTo(0, 38, 16, 48, 32, 64);
@@ -63,23 +65,31 @@
         }
         const heartTexture = createHeartTexture();
 
-        // Tăng lượng hạt lên để hình rõ nét hơn
-        const CONFIG = { particleCount: 8000, heartCount: 200, orbitRadius: 60 };
+        // CẤU HÌNH MỚI: Tăng số lượng hạt, giảm kích thước
+        const CONFIG = { 
+            particleCount: 15000, // Tăng gấp đôi số hạt để ảnh mịn
+            heartCount: 150, 
+        };
         
         let scene, camera, renderer, mainParticles, heartParticles;
         let photoMeshes = [];
-        let state = 'DUO'; let handX = 0.5;
+        let state = 'DUO'; 
+        let handX = 0.5; // Vị trí tay (0.0 -> 1.0)
         
-        let targetPositions = { duo: null, carrot: null, fox: null };
-        let targetColors = { duo: null, carrot: null, fox: null };
+        // Bộ nhớ đệm cho các hình dáng
+        let targetPositions = { duo: null, carrot: null };
+        let targetColors = { duo: null, carrot: null };
         let isStarted = false;
 
         function init3D() {
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x050505, 0.002);
+            scene.fog = new THREE.FogExp2(0x020202, 0.002);
             camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.z = (window.innerWidth < 768) ? 180 : 140;
+            
+            // Camera lùi xa hơn chút để thấy toàn cảnh
+            camera.position.z = (window.innerWidth < 768) ? 190 : 150; 
+            
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -87,17 +97,18 @@
 
             createPhotos(); createFloatingHearts();
 
-            // --- PHẦN QUAN TRỌNG: XỬ LÝ ẢNH ---
+            // --- XỬ LÝ ẢNH (QUAN TRỌNG) ---
             Promise.all([
-                // Điều chỉnh tọa độ (offset) và tỷ lệ (scale) để Nick và Judy không bị chồng lấn
-                imageToPoints(nickImg, -35, 0.8),   // Nick bên trái, to hơn chút
-                imageToPoints(judyImg, 35, 0.7),    // Judy bên phải, nhỏ hơn chút
-                imageToPoints(carrotImg, 0, 0.8),   // Cà rốt giữa
-                imageToPoints(nickImg, 0, 1.1)      // Cáo to (khi chụm tay)
+                // Nick: Dịch sang trái (-40), Scale to (0.9)
+                imageToPoints(nickImg, -40, 0.9),   
+                // Judy: Dịch sang phải (+40), Scale nhỏ hơn Nick xíu (0.75)
+                imageToPoints(judyImg, 40, 0.75),    
+                // Cà rốt: Ở giữa, Scale vừa (0.8)
+                imageToPoints(carrotImg, 0, 0.8)
             ]).then(results => {
-                const [nickData, judyData, carrotData, foxData] = results;
+                const [nickData, judyData, carrotData] = results;
                 
-                // Gộp điểm của Nick và Judy lại
+                // Gộp Nick và Judy vào trạng thái DUO
                 const duoPoints = [...nickData.points, ...judyData.points];
                 const duoCols = [...nickData.colors, ...judyData.colors];
                 
@@ -105,13 +116,10 @@
                 targetColors.duo = new Float32Array(CONFIG.particleCount * 3);
                 targetPositions.carrot = new Float32Array(CONFIG.particleCount * 3);
                 targetColors.carrot = new Float32Array(CONFIG.particleCount * 3);
-                targetPositions.fox = new Float32Array(CONFIG.particleCount * 3);
-                targetColors.fox = new Float32Array(CONFIG.particleCount * 3);
 
-                // Điền dữ liệu vào bộ nhớ
+                // Lấp đầy bộ nhớ (Fill buffer)
                 fillBuffer(targetPositions.duo, duoPoints); fillBuffer(targetColors.duo, duoCols);
                 fillBuffer(targetPositions.carrot, carrotData.points); fillBuffer(targetColors.carrot, carrotData.colors);
-                fillBuffer(targetPositions.fox, foxData.points); fillBuffer(targetColors.fox, foxData.colors);
 
                 createMainParticleSystem(); animate();
             });
@@ -121,7 +129,7 @@
             if (!data || data.length === 0) {
                 for (let i=0; i<buffer.length; i++) buffer[i] = (Math.random()-0.5)*100; return;
             }
-            // Lặp lại dữ liệu nếu số điểm ảnh ít hơn số hạt
+            // Shuffle nhẹ để hạt bay đẹp hơn khi chuyển cảnh
             for (let i = 0; i < buffer.length; i++) buffer[i] = data[i % data.length]; 
         }
 
@@ -129,16 +137,21 @@
             return new Promise(resolve => {
                 const run = () => {
                     const canvas = document.createElement('canvas');
-                    const w = 150; const h = w * (img.height / img.width);
+                    // TĂNG ĐỘ PHÂN GIẢI QUÉT (200px) ĐỂ HẠT MỊN HƠN
+                    const w = 200; 
+                    const h = w * (img.height / img.width);
                     canvas.width = w; canvas.height = h;
                     const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+                    
                     if (img.width === 0) { resolve({points:[], colors:[]}); return; }
+
                     const data = ctx.getImageData(0, 0, w, h).data;
                     const points = [], colors = [];
                     for(let y=0; y<h; y++) {
                         for(let x=0; x<w; x++) {
                             const i = (y*w + x) * 4;
-                            if(data[i+3] > 100) { // Lấy điểm không trong suốt
+                            // Lấy điểm ảnh có độ đục > 50 (lấy cả lông tơ mờ mờ)
+                            if(data[i+3] > 50) { 
                                 points.push((x - w/2) * scale + offsetX, -(y - h/2) * scale, 0);
                                 colors.push(data[i]/255, data[i+1]/255, data[i+2]/255);
                             }
@@ -146,7 +159,6 @@
                     }
                     resolve({ points, colors });
                 };
-                // Đảm bảo ảnh đã tải xong mới xử lý
                 if(img.complete && img.naturalWidth !== 0) run(); 
                 else { img.onload = run; img.onerror = () => resolve({points:[], colors:[]}); }
             });
@@ -156,12 +168,14 @@
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(CONFIG.particleCount * 3);
             const col = new Float32Array(CONFIG.particleCount * 3);
-            for(let i=0; i<pos.length; i++) pos[i] = (Math.random()-0.5)*300;
+            for(let i=0; i<pos.length; i++) pos[i] = (Math.random()-0.5)*300; // Ban đầu bay loạn xạ
+            
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-            // Hạt nhỏ mịn
+            
+            // CHỈNH SIZE HẠT NHỎ LẠI (0.8)
             const mat = new THREE.PointsMaterial({
-                size: 1.2, vertexColors: true, transparent: true, opacity: 0.9,
+                size: 0.8, vertexColors: true, transparent: true, opacity: 0.95,
                 depthWrite: false, blending: THREE.AdditiveBlending
             });
             mainParticles = new THREE.Points(geo, mat); scene.add(mainParticles);
@@ -171,24 +185,28 @@
             const geo = new THREE.BufferGeometry();
             const pos = new Float32Array(CONFIG.heartCount * 3);
             for(let i=0; i<pos.length; i+=3) {
-                pos[i] = (Math.random()-0.5)*250; pos[i+1] = Math.random()*200 - 100; pos[i+2] = (Math.random()-0.5)*100;
+                pos[i] = (Math.random()-0.5)*300; pos[i+1] = Math.random()*200 - 100; pos[i+2] = (Math.random()-0.5)*150;
             }
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             const mat = new THREE.PointsMaterial({
-                size: 4.0, map: heartTexture, color: 0xff69b4,
-                transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending
+                size: 3.0, map: heartTexture, color: 0xff69b4,
+                transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending
             });
             heartParticles = new THREE.Points(geo, mat); scene.add(heartParticles);
         }
 
         function createPhotos() {
-            const geo = new THREE.PlaneGeometry(14, 16); const borderGeo = new THREE.PlaneGeometry(16, 18);
+            const geo = new THREE.PlaneGeometry(14, 16); 
+            const borderGeo = new THREE.PlaneGeometry(15.5, 18); // Viền Polaroid
             const borderMat = new THREE.MeshBasicMaterial({color: 0xffffff}); 
+
             for(let i=0; i<5; i++) {
                 const mat = new THREE.MeshBasicMaterial({ map: photoTextures[i], side: THREE.DoubleSide });
-                const mesh = new THREE.Mesh(geo, mat); mesh.position.y = 1; 
-                const border = new THREE.Mesh(borderGeo, borderMat); border.position.z = -0.05;
-                mesh.add(border); mesh.visible = false; scene.add(mesh); photoMeshes.push(mesh);
+                const mesh = new THREE.Mesh(geo, mat); 
+                const border = new THREE.Mesh(borderGeo, borderMat); border.position.z = -0.1; border.position.y = -0.5;
+                mesh.add(border); 
+                mesh.visible = false; 
+                scene.add(mesh); photoMeshes.push(mesh);
             }
         }
 
@@ -198,50 +216,75 @@
             const colors = mainParticles.geometry.attributes.color.array;
             
             let targetPos, targetCol;
-            if (state === 'CARROT') {
+            
+            if (state === 'CARROT') { // XÒE TAY
                 targetPos = targetPositions.carrot; targetCol = targetColors.carrot;
-            } else if (state === 'FOX') { 
-                targetPos = targetPositions.fox; targetCol = targetColors.fox;
-            } else { 
+                mainParticles.visible = true;
+            } else if (state === 'FOX') { // CHỤM TAY -> ẨN HẠT, HIỆN ẢNH
+                 // Kỹ thuật: Ẩn hạt đi để nhường chỗ cho ảnh
+                 mainParticles.visible = false; 
+                 return; // Không cần tính toán vị trí hạt nữa
+            } else { // DUO
                 targetPos = targetPositions.duo; targetCol = targetColors.duo;
+                mainParticles.visible = true;
             }
 
             for(let i=0; i<positions.length; i++) {
+                // Di chuyển mượt (Lerp)
                 positions[i] += (targetPos[i] - positions[i]) * speed;
                 colors[i] += (targetCol[i] - colors[i]) * speed;
             }
             mainParticles.geometry.attributes.position.needsUpdate = true;
             mainParticles.geometry.attributes.color.needsUpdate = true;
             
-            if(state === 'DUO') mainParticles.rotation.y += 0.002;
-            else if(state === 'CARROT') mainParticles.rotation.y += 0.01;
+            // QUAN TRỌNG: ĐÃ BỎ XOAY VÒNG (Rotation) ĐỂ KHÔNG BỊ CHÓNG MẶT
+            mainParticles.rotation.y = 0; 
+            mainParticles.rotation.x = 0;
         }
 
-        function updateHearts(time) {
-            const positions = heartParticles.geometry.attributes.position.array;
-            for(let i=0; i<positions.length; i+=3) {
-                positions[i+1] += Math.sin(time + i)*0.05 + 0.05; 
-                if(positions[i+1] > 100) positions[i+1] = -100; 
-            }
-            heartParticles.geometry.attributes.position.needsUpdate = true;
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const time = Date.now() * 0.001;
-            const speed = 0.08; 
-            updateMainParticles(speed); updateHearts(time);
-
-            if (state === 'FOX') { // CHỤM TAY -> HIỆN ẢNH POLAROID
+        function updatePhotos() {
+            if (state === 'FOX') { // CHỈ HIỆN KHI CHỤM TAY
                 photoMeshes.forEach((mesh, i) => {
                     mesh.visible = true;
-                    const angle = -Math.PI/2 + (i-2)*0.3; const r = 70;
-                    mesh.position.lerp(new THREE.Vector3(Math.sin(angle)*r, Math.cos(angle)*10 - 10, Math.cos(angle)*r - 30), 0.1);
-                    mesh.lookAt(camera.position); mesh.rotation.z = (i-2)*-0.1; 
+                    
+                    // Setup vị trí hình cung
+                    const baseAngle = -Math.PI/2 + (i-2)*0.35; 
+                    const radius = 65;
+                    
+                    // LOGIC BAY THEO TAY:
+                    // handX chạy từ 0 (trái) đến 1 (phải). 0.5 là giữa.
+                    // Nghiêng cả cụm ảnh theo tay
+                    const handTilt = (handX - 0.5) * 1.5; // Góc nghiêng thêm
+                    const finalAngle = baseAngle + handTilt;
+
+                    const targetX = Math.sin(finalAngle) * radius;
+                    const targetZ = Math.cos(finalAngle) * radius - 40; // Đẩy ra sau xíu
+                    const targetY = Math.cos(finalAngle) * 10 - 5;
+
+                    mesh.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.08);
+                    mesh.lookAt(camera.position); 
+                    
+                    // Nghiêng ảnh nhẹ theo đà
+                    mesh.rotation.z = (i-2)*-0.15 + (handX-0.5)*0.5; 
                 });
             } else {
                 photoMeshes.forEach(m => { m.visible = false; });
             }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updateMainParticles(0.1); // Tốc độ tụ hạt
+            updatePhotos();
+            
+            // Hạt tim bay nền nhẹ nhàng
+            const hPos = heartParticles.geometry.attributes.position.array;
+            for(let i=1; i<hPos.length; i+=3) {
+                hPos[i] += 0.2; // Bay lên chậm
+                if(hPos[i] > 100) hPos[i] = -100;
+            }
+            heartParticles.geometry.attributes.position.needsUpdate = true;
+
             renderer.render(scene, camera);
         }
 
@@ -254,18 +297,23 @@
             const video = document.getElementsByClassName('input_video')[0];
             const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            
             hands.onResults(results => {
                 if(results.multiHandLandmarks.length > 0) {
-                    const lm = results.multiHandLandmarks[0]; handX = lm[9].x; 
+                    const lm = results.multiHandLandmarks[0]; 
+                    handX = lm[9].x; // Lấy tọa độ ngang của tay (để điều khiển ảnh)
+                    
                     const tips = [8,12,16,20]; const wrist = lm[0];
                     let openDist = 0; tips.forEach(i => openDist += Math.hypot(lm[i].x-wrist.x, lm[i].y-wrist.y));
                     const pinchDist = Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y);
                     
-                    if (pinchDist < 0.06) state = 'FOX';       
-                    else if (openDist/4 > 0.3) state = 'CARROT'; 
-                    else state = 'DUO';                        
+                    // LOGIC CHUYỂN TRẠNG THÁI
+                    if (pinchDist < 0.06) state = 'FOX';       // Chụm -> Hiện Ảnh bay
+                    else if (openDist/4 > 0.25) state = 'CARROT'; // Xòe -> Cà rốt
+                    else state = 'DUO';                        // Thả lỏng -> Nick Judy
                 } else { state = 'DUO'; }
             });
+            
             const cameraUtils = new Camera(video, { onFrame: async () => { await hands.send({image: video}); }, width: 320, height: 240 });
             cameraUtils.start();
         }
